@@ -18,8 +18,10 @@ import {
   Building2
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
+import PhoneInput from '../components/PhoneInput';
 import { tenantAPI, unitAPI, infrastructureAPI, authAPI } from '../services/api';
 import { formatDate } from '../utils/formatters';
+import { toInternationalFormat, parseInternationalNumber } from '../utils/countries';
 import toast from 'react-hot-toast';
 
 const Tenants = () => {
@@ -40,7 +42,8 @@ const Tenants = () => {
     first_name: '',
     last_name: '',
     email: '',
-    phone: '',
+    phone: '',              // local number without country code
+    phoneCountry: 'RW',      // country code (RW, KE, UG, ...)
     national_id: '',
     date_of_birth: '',
     gender: 'male',
@@ -84,6 +87,7 @@ const Tenants = () => {
       last_name: '',
       email: '',
       phone: '',
+      phoneCountry: 'RW',
       national_id: '',
       date_of_birth: '',
       gender: 'male',
@@ -106,11 +110,15 @@ const Tenants = () => {
   };
 
   const openEditModal = (tenant) => {
+    // Parse existing phone back into country + local number
+    const { countryCode, localNumber } = parseInternationalNumber(tenant.phone);
+
     setFormData({
       first_name: tenant.first_name || '',
       last_name: tenant.last_name || '',
       email: tenant.email || '',
-      phone: tenant.phone || '',
+      phone: localNumber || '',
+      phoneCountry: countryCode || 'RW',
       national_id: tenant.national_id || '',
       date_of_birth: tenant.date_of_birth || '',
       gender: tenant.gender || 'male',
@@ -143,13 +151,26 @@ const Tenants = () => {
       return;
     }
 
+    // Validate phone number
+    if (formData.phone.length < 8) {
+      toast.error('Please enter a complete phone number');
+      return;
+    }
+
     setSaving(true);
     try {
+      // Convert to international format for backend
+      const { phoneCountry, ...rest } = formData;
+      const payload = {
+        ...rest,
+        phone: toInternationalFormat(formData.phone, phoneCountry)
+      };
+
       if (editingTenant) {
-        await tenantAPI.update(editingTenant.id, formData);
+        await tenantAPI.update(editingTenant.id, payload);
         toast.success('Tenant updated successfully');
       } else {
-        await tenantAPI.create(formData);
+        await tenantAPI.create(payload);
         toast.success('Tenant created successfully');
       }
 
@@ -244,7 +265,7 @@ const Tenants = () => {
           </div>
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-sm"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition shadow-sm"
           >
             <Plus className="w-5 h-5" />
             Add Tenant
@@ -260,7 +281,7 @@ const Tenants = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, email, phone, or ID..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
             />
           </div>
 
@@ -268,7 +289,7 @@ const Tenants = () => {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -279,7 +300,7 @@ const Tenants = () => {
             <select
               value={filterProperty}
               onChange={(e) => setFilterProperty(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
             >
               <option value="all">All Properties</option>
               {properties.map((p) => (
@@ -321,7 +342,7 @@ const Tenants = () => {
             {!searchQuery && filterStatus === 'all' && filterProperty === 'all' && (
               <button
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition"
               >
                 <Plus className="w-5 h-5" />
                 Add Your First Tenant
@@ -342,9 +363,9 @@ const Tenants = () => {
                   className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition overflow-hidden"
                 >
                   <div className="p-6">
-                    {/* Header: Avatar + Name + Status */}
+                    {/* Header */}
                     <div className="flex items-start gap-4 mb-4">
-                      <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center flex-shrink-0">
                         <span className="text-white font-bold text-lg">
                           {tenant.first_name?.[0]}{tenant.last_name?.[0]}
                         </span>
@@ -398,7 +419,7 @@ const Tenants = () => {
                     <div className="grid grid-cols-2 gap-2 pt-4 border-t border-gray-100">
                       <button
                         onClick={() => openEditModal(tenant)}
-                        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
                       >
                         <Edit className="w-4 h-4" />
                         Edit
@@ -473,7 +494,7 @@ const Tenants = () => {
                     name="first_name"
                     value={formData.first_name}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                     required
                   />
                 </div>
@@ -486,7 +507,7 @@ const Tenants = () => {
                     name="last_name"
                     value={formData.last_name}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                     required
                   />
                 </div>
@@ -502,7 +523,7 @@ const Tenants = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                     required
                   />
                 </div>
@@ -510,14 +531,11 @@ const Tenants = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Phone <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="tel"
-                    name="phone"
+                  <PhoneInput
                     value={formData.phone}
-                    onChange={handleChange}
-                    placeholder="+250788123456"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    required
+                    countryCode={formData.phoneCountry}
+                    onChange={(v) => setFormData({ ...formData, phone: v })}
+                    onCountryChange={(c) => setFormData({ ...formData, phoneCountry: c })}
                   />
                 </div>
               </div>
@@ -532,7 +550,7 @@ const Tenants = () => {
                     name="national_id"
                     value={formData.national_id}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                     required
                   />
                 </div>
@@ -545,7 +563,7 @@ const Tenants = () => {
                     name="date_of_birth"
                     value={formData.date_of_birth}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   />
                 </div>
               </div>
@@ -558,7 +576,7 @@ const Tenants = () => {
                   name="gender"
                   value={formData.gender}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                 >
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -579,7 +597,7 @@ const Tenants = () => {
                     name="occupation"
                     value={formData.occupation}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   />
                 </div>
                 <div>
@@ -591,7 +609,7 @@ const Tenants = () => {
                     name="employer"
                     value={formData.employer}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   />
                 </div>
               </div>
@@ -605,7 +623,7 @@ const Tenants = () => {
                   name="employer_phone"
                   value={formData.employer_phone}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                 />
               </div>
 
@@ -620,7 +638,7 @@ const Tenants = () => {
                   name="unit_id"
                   value={formData.unit_id}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                 >
                   <option value="">No unit (assign later)</option>
                   {availableUnits.map((u) => {
@@ -644,7 +662,7 @@ const Tenants = () => {
                     name="move_in_date"
                     value={formData.move_in_date}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   />
                 </div>
                 <div>
@@ -655,7 +673,7 @@ const Tenants = () => {
                     name="status"
                     value={formData.status}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   >
                     <option value="pending">Pending</option>
                     <option value="active">Active</option>
@@ -677,7 +695,7 @@ const Tenants = () => {
                     name="emergency_contact_name"
                     value={formData.emergency_contact_name}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   />
                 </div>
                 <div>
@@ -689,7 +707,7 @@ const Tenants = () => {
                     name="emergency_contact_phone"
                     value={formData.emergency_contact_phone}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                   />
                 </div>
               </div>
@@ -703,7 +721,7 @@ const Tenants = () => {
                   name="current_address"
                   value={formData.current_address}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
                 />
               </div>
             </form>
@@ -720,7 +738,7 @@ const Tenants = () => {
               <button
                 onClick={handleSubmit}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition disabled:opacity-50"
               >
                 {saving ? (
                   <>
